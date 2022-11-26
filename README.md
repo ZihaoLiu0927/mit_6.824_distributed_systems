@@ -1,6 +1,8 @@
 # mit_6.824_distributed_system
 This repo records my implementation for all lab assignments of the public course Mit 6.824 (http://nil.csail.mit.edu/6.824/2021/schedule.html)
 
+
+## Content
 - [x] Lab 1: Distributed MapReduce with a single master server and multiple worker servers
 
 - [x] Lab 2: Raft consensus algorithm implementation
@@ -19,6 +21,14 @@ This repo records my implementation for all lab assignments of the public course
 
 - [ ] Lab 4: Sharded Key/Value Service
 
+## Environment
 
+- Go 1.19.3
 
-mit_6.824_distributed_system
+## How to Run
+
+```shell
+cd mit_6.824_distributed_system
+cd /src/raft
+sh runRaftTest.sh
+```
