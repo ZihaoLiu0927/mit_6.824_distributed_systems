@@ -25,7 +25,7 @@ This repo records my implementation for all lab assignments of the public course
 
 - Go 1.19.3
 
-## How to Run
+## How to Run Test
 
 ```shell
 cd mit_6.824_distributed_system
