@@ -30,6 +30,5 @@ To eliminate any non-deterministic factors that possibly result in passing the t
 
 ```shell
 cd mit_6.824_distributed_system
-cd /src/raft
-sh runRaftTest.sh -n 100
+sh src/raft/runRaftTest.sh -n 100
 ```
