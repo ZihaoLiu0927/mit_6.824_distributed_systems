@@ -26,9 +26,10 @@ This repo records my implementation for all lab assignments of the public course
 - Go 1.19.3
 
 ## How to Run Test
+To eliminate any non deterministic factors that possibly result in passing the tests by chance, I create a shell script that will run the tests n times and summarize the times of passing the tests, where n can be manually passed in e.g. -n 100.
 
 ```shell
 cd mit_6.824_distributed_system
 cd /src/raft
-sh runRaftTest.sh
+sh runRaftTest.sh -n 100
 ```
