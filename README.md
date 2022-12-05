@@ -1,5 +1,5 @@
-# mit_6.824_distributed_system
-This repo records my implementation for all lab assignments of the public course Mit 6.824 (http://nil.csail.mit.edu/6.824/2021/schedule.html)
+# mit_6.824_distributed_systems
+This repo records my implementation for all lab assignments of the public course Mit 6.824 (http://nil.csail.mit.edu/6.824/2021/schedule.html). Thank to the professor Robert Morris and MIT for releasing this amazing course to be public.
 
 
 ## Content
