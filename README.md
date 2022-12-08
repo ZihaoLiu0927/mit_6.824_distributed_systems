@@ -4,7 +4,7 @@ This repo records my implementation for all lab assignments of the public course
 
 ## Content
 - [x] Lab 1: Distributed MapReduce with a single master server and multiple worker servers
-  - [x] implemented fault tolerant for worker crash.
+  - [x] implemented fault tolerance for worker crash.
 - [x] Lab 2: Raft consensus algorithm implementation
   - [x] Lab 2A: Raft leader election:
     - Used a heartbeat mechanism to trigger leader election.
