@@ -686,10 +686,8 @@ func (rf *Raft) heartbeat() {
 
 				} else {
 					// AppendEntries fails because of outdated term
-					if rf.status.currentTerm < reply.Term || reply.Term == 0 {
-						if reply.Term != 0 {
-							rf.status.currentTerm = reply.Term
-						}
+					if rf.status.currentTerm < reply.Term {
+						rf.status.currentTerm = reply.Term
 						rf.state = Follower
 						rf.status.votedFor = -1
 
