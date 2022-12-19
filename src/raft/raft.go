@@ -135,6 +135,8 @@ func (rf *Raft) persist() {
 	e.Encode(rf.pstate)
 	data := w.Bytes()
 	rf.persister.SaveRaftState(data)
+	DPrintf("persist: server %v persists its state to disk, its log is: %v, term is: %v, votefor: %v",
+		rf.me, rf.printLog(), rf.pstate.CurrentTerm, rf.pstate.VotedFor)
 }
 
 // restore previously persisted state.
@@ -152,6 +154,8 @@ func (rf *Raft) readPersist(data []byte) {
 	} else {
 		rf.pstate = pstate
 	}
+	DPrintf("read persist: server %v loads its state from disk, its log is: %v, term is: %v, votefor: %v",
+		rf.me, rf.printLog(), rf.pstate.CurrentTerm, rf.pstate.VotedFor)
 }
 
 // A service wants to switch to snapshot.  Only do so if Raft hasn't
@@ -234,7 +238,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 			rf.pstate.VotedFor = args.CandidateId
 			rf.resetTimer()
 
-			DPrintf("server %v last log[%v, %v] grants candidate %v last log[%v, %v] bc longer log length\n",
+			DPrintf("server %v with last log[%v, %v] grants candidate %v last log[%v, %v] bc longer log length\n",
 				rf.me, rf.pstate.Logs[len(rf.pstate.Logs)-1].Pos, rf.pstate.Logs[len(rf.pstate.Logs)-1].TermReceive,
 				args.CandidateId, args.LastLogIndex, args.LastLogTerm)
 			return
@@ -531,7 +535,6 @@ func (rf *Raft) tryElection() {
 	DPrintf("server %v[%v] starts a new election\n", rf.me, term)
 	prepArgs := rf.prepareVoteArgs()
 
-	rf.persist()
 	rf.mu.Unlock()
 
 	done := false
@@ -556,6 +559,7 @@ func (rf *Raft) tryElection() {
 
 			rf.mu.Lock()
 			defer rf.mu.Unlock()
+			defer rf.persist()
 
 			if rf.pstate.CurrentTerm != term {
 				return
@@ -565,7 +569,6 @@ func (rf *Raft) tryElection() {
 				rf.pstate.CurrentTerm = reply.Term
 				rf.status = Follower
 				rf.pstate.VotedFor = -1
-				rf.persist()
 				DPrintf("candidate %v return to a follower\n", rf.me)
 				return
 			}
@@ -581,11 +584,7 @@ func (rf *Raft) tryElection() {
 				rf.vstate.leaderId = rf.me
 				rf.status = Leader
 
-				temp := make([][]int, 0)
-				for _, entry := range rf.pstate.Logs {
-					a := []int{entry.Pos, entry.TermReceive}
-					temp = append(temp, a)
-				}
+				temp := rf.printLog()
 				DPrintf("New leader: %v[%v] is selected to be a leader. its log is %v \n", rf.me, rf.pstate.CurrentTerm, temp)
 
 				rf.initializeLogIndexes(len(rf.pstate.Logs))
@@ -593,6 +592,10 @@ func (rf *Raft) tryElection() {
 			}
 		}(i)
 	}
+
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	rf.persist()
 }
 
 // This function does not claim lock itself
@@ -721,6 +724,15 @@ func (rf *Raft) heartbeat() {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+func (rf *Raft) printLog() [][]int {
+	temp := make([][]int, 0)
+	for _, entry := range rf.pstate.Logs {
+		a := []int{entry.Pos, entry.TermReceive}
+		temp = append(temp, a)
+	}
+	return temp
 }
 
 // the service or tester wants to create a Raft server. the ports
