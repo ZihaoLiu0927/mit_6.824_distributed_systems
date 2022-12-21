@@ -135,8 +135,8 @@ func (rf *Raft) persist() {
 	e.Encode(rf.pstate)
 	data := w.Bytes()
 	rf.persister.SaveRaftState(data)
-	DPrintf("persist: server %v persists its state to disk, its log is: %v, term is: %v, votefor: %v",
-		rf.me, rf.printLog(), rf.pstate.CurrentTerm, rf.pstate.VotedFor)
+	// DPrintf("persist: server %v persists its state to disk, its log is: %v, term is: %v, votefor: %v",
+	// 	rf.me, rf.printLog(), rf.pstate.CurrentTerm, rf.pstate.VotedFor)
 }
 
 // restore previously persisted state.
@@ -154,8 +154,8 @@ func (rf *Raft) readPersist(data []byte) {
 	} else {
 		rf.pstate = pstate
 	}
-	DPrintf("read persist: server %v loads its state from disk, its log is: %v, term is: %v, votefor: %v",
-		rf.me, rf.printLog(), rf.pstate.CurrentTerm, rf.pstate.VotedFor)
+	// DPrintf("read persist: server %v loads its state from disk, its log is: %v, term is: %v, votefor: %v",
+	// 	rf.me, rf.printLog(), rf.pstate.CurrentTerm, rf.pstate.VotedFor)
 }
 
 // A service wants to switch to snapshot.  Only do so if Raft hasn't
@@ -308,7 +308,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	// step 2: Reply FALSE if log doesn’t contain an entry at prevLogIndex
 	if args.PrevLogIndex >= 0 && len(rf.pstate.Logs) < args.PrevLogIndex+1 {
-		reply.BackupIndex = len(rf.pstate.Logs) - 1
+		reply.BackupIndex = len(rf.pstate.Logs)
 		return
 	}
 
