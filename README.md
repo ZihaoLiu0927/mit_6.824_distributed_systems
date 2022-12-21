@@ -13,7 +13,7 @@ This repo records my implementation for all lab assignments of the public course
     - Used terms and log position/index to ensure the logs up-to-date and consistency.
     - kept tracking of log index committed to state machine (client application) for each server. Indexes marked as a commitIndex are consistent for majority and safe to apply to state machine.
   - [x] Lab 2C: Raft persistent state
-  - [ ] Lab 2D: Raft snapshotting/log compaction
+  - [x] Lab 2D: Raft snapshotting/log compaction
   
 - [ ] Lab 3: Fault-tolerant Key/Value Service
   - [ ] Lab 3A: Key/value Service Without Log Compaction
