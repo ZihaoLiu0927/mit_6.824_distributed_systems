@@ -35,7 +35,7 @@ echo "Start running raft tests ${ITER} times..." > testout.txt
 MAX=$(($ITER))
 for ((i=1; i<=$MAX;i++))
 do
-    echo "starting iteration ${i}: "
+    echo "starting iteration ${i}..."
     echo "starting iteration ${i}: " >> testout.txt
     #go test -timeout 60s -race -run TestFigure8Unreliable2C >> testout.txt
     go test -run 2C -race >> testout.txt
