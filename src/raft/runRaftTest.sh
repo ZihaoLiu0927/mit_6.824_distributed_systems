@@ -33,18 +33,42 @@ echo "Job started..."
 echo "Start running raft tests ${ITER} times..." > testout.txt
 
 MAX=$(($ITER))
+ratio=0
+scale=0
+if [ $MAX -gt 10 ]; then
+    CHECKPOINT=$(($MAX/10))
+    scale=$(echo "scale=3; 1.0*$CHECKPOINT/$MAX*100"|bc)
+else
+    CHECKPOINT=$((10/$MAX))
+    scale=$(echo "scale=3; 1.0/$MAX*100"|bc)
+fi
+
 for ((i=1; i<=$MAX;i++))
 do
-    echo "starting iteration ${i}..."
+    if [ $MAX -gt 10 ]; then
+        if !(( $i % $CHECKPOINT )); then
+            printf "Test Progress: [%-20s]%.1f%%\r" "${mark}" "${ratio}"
+            ratio=$(echo "scale=3; ${ratio}+5"|bc)
+            mark="#${mark}"
+        fi
+    else
+        printf "Test Progress: [%-20s]%.1f%%\r" "${mark}" "${ratio}"
+        for ((k=0;k<$CHECKPOINT;k++))
+        do
+            mark="##${mark}"
+        done
+        ratio=$(echo "scale=3; ${ratio}+$scale"|bc)
+    fi
+
     echo "starting iteration ${i}: " >> testout.txt
-    #go test -timeout 60s -race -run TestFigure8Unreliable2C >> testout.txt
-    go test -run 2C -race >> testout.txt
+    go test -run 2A -race >> testout.txt
     echo "" >> testout.txt
+
 done
+printf "Test Progress: [%-20s]%.1f%%\n" "####################" "100"
 
 pass_num=$(cat testout.txt | grep ok | wc -l | xargs)
 echo "Running the test a total of ${ITER} times, with ${pass_num} times passed." >> testout.txt
 
-echo "Job done"
-echo "Running the test a total of ${ITER} times, with ${pass_num} times passed." 
-
+echo "Job done!"
+echo "Running the test a total of ${ITER} times, with ${pass_num} times passed."
