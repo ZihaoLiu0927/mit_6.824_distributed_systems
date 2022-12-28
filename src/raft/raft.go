@@ -288,8 +288,8 @@ func (rf *Raft) trimLogAndUpdateSnapInfo(localIdx int, LastIncludedIndex int, La
 		rf.pstate.Logs = make([]Log, 0)
 		rf.pstate.LatestIndex = LastIncludedIndex
 	} else {
-		newlog := make([]Log, 0)
-		rf.pstate.Logs = append(newlog, rf.pstate.Logs[localIdx+1:]...)
+		// discard the logs before and at local index
+		rf.pstate.Logs = rf.pstate.Logs[localIdx+1:]
 	}
 	rf.updateSnapshotInfo(LastIncludedIndex, LastIncludedTerm, snapshot)
 }
