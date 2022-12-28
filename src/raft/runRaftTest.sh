@@ -50,8 +50,8 @@ do
     if [ $MAX -gt 10 ]; then
         if !(( $i % $CHECKPOINT )); then
             printf "Test Progress: [%-20s]%.1f%%\r" "${mark}" "${ratio}"
-            ratio=$(echo "scale=3; ${ratio}+5"|bc)
-            mark="#${mark}"
+            ratio=$(echo "scale=3; ${ratio}+10"|bc)
+            mark="##${mark}"
         fi
     else
         printf "Test Progress: [%-20s]%.1f%%\r" "${mark}" "${ratio}"
