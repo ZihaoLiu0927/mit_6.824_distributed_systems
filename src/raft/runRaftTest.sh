@@ -43,6 +43,8 @@ else
     scale=$(echo "scale=3; 1.0/$MAX*100"|bc)
 fi
 
+start=`date +%s`
+
 for ((i=1; i<=$MAX;i++))
 do
     if [ $MAX -gt 10 ]; then
@@ -61,14 +63,17 @@ do
     fi
 
     echo "starting iteration ${i}: " >> testout.txt
-    go test -run 2A -race >> testout.txt
+    go test -run 2D -race >> testout.txt
     echo "" >> testout.txt
 
 done
 printf "Test Progress: [%-20s]%.1f%%\n" "####################" "100"
 
+end=`date +%s.%N`
+runtime=$( echo "$end - $start" | bc -l )
+
 pass_num=$(cat testout.txt | grep ok | wc -l | xargs)
-echo "Running the test a total of ${ITER} times, with ${pass_num} times passed." >> testout.txt
+echo "Running the test a total of ${ITER} times, with ${pass_num} times passed. \nTotal time spent: ${runtime} seconds." >> testout.txt
 
 echo "Job done!"
-echo "Running the test a total of ${ITER} times, with ${pass_num} times passed."
+echo "Running the test a total of ${ITER} times, with ${pass_num} times passed. \nTotal time spent: ${runtime} seconds."
