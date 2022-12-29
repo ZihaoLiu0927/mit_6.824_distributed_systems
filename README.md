@@ -4,7 +4,7 @@ This repo records my implementation for all lab assignments of the public course
 
 ## Content
 - [x] Lab 1: Distributed MapReduce with a single master server and multiple worker servers
-  - [x] implemented fault tolerance for worker crash.
+  - [x] implemented fault tolerance mechanism for worker crash.
 - [x] Lab 2: Raft consensus algorithm implementation
   - [x] Lab 2A: Raft leader election:
     - Used a heartbeat mechanism to trigger leader election.
@@ -16,7 +16,7 @@ This repo records my implementation for all lab assignments of the public course
     - Used persistent state to recover state from machine crash.
     - Needed to pass more stringent tests for network delay.
   - [x] Lab 2D: Raft snapshotting/log compaction
-    - Implemented snapshot machanisms to avoid machine running out of memory and storage.
+    - Implemented snapshot mechanisms to avoid machine running out of memory and storage.
   
 - [ ] Lab 3: Fault-tolerant Key/Value Service
   - [ ] Lab 3A: Key/value Service Without Log Compaction
