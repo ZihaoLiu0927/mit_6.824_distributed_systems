@@ -282,6 +282,7 @@ func (rf *Raft) persistStateAndSnapshot() {
 	}
 }
 
+// Discard the logs that have been snapshoted in log array
 func (rf *Raft) trimLogAndUpdateSnapInfo(localIdx int, LastIncludedIndex int, LastIncludedTerm int, snapshot []byte) {
 	if localIdx == -1 {
 		// discard the entire log if input index is -1
