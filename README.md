@@ -14,9 +14,9 @@ This repo records my implementation for all lab assignments of the public course
     - kept tracking of log index committed to state machine (client application) for each server. Indexes marked as a commitIndex are consistent for majority and safe to apply to state machine.
   - [x] Lab 2C: Raft persistent state
     - Used persistent state to recover state from machine crash.
-    - Needed to pass more stringent tests for network delay.
+    - More implementation to handle network delay.
   - [x] Lab 2D: Raft snapshotting/log compaction
-    - Implemented snapshot mechanisms to avoid machine running out of memory and storage.
+    - Implemented snapshot mechanisms to avoid machine running out of memory and storage, including snapshot function called by server and an install snapshot RPC function used by leader to handle follower lagging too behind.
   
 - [ ] Lab 3: Fault-tolerant Key/Value Service
   - [ ] Lab 3A: Key/value Service Without Log Compaction
