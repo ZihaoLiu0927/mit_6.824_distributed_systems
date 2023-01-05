@@ -458,7 +458,8 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	// Get the prevLogIndex matched entry in this machine
 	prevLog, prevLogLocalIndex := rf.getLogEntry(args.PrevLogIndex)
 
-	// Ignore any outdated AppendEntries RPC
+	// Ignore any outdated AppendEntries RPC.
+	// Node prevLogLocalIndex = -1 is meaningful and means the prevLogIndex to be compared is right at the snapshot's lastIncludedIndex
 	if prevLogLocalIndex < -1 {
 		return
 	}
@@ -475,9 +476,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			rf.me, rf.pstate.CurrentTerm, args.LeaderId, args.Term, args.PrevLogIndex, reply.BackupIndex)
 		return
 	}
-
-	DPrintf("Heartbeat for %v[%v], from leader %v[%v], follower's previous logs is: [pos: %v, term: %v], prevLogIndex: [local %v, raw %v]",
-		rf.me, rf.pstate.CurrentTerm, args.LeaderId, args.Term, lastLog.RawIndex, lastLog.TermReceive, prevLogLocalIndex, args.PrevLogIndex)
 
 	// save the last log info on this machine before updating the log entry array
 	olgLatestIndex := lastLog.RawIndex

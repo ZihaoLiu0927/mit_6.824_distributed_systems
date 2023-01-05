@@ -1,7 +1,7 @@
 #!/bin/bash
 
 usage() {
-  echo "Usage: $0 [ -n ITERATION ]" 1>&2 
+  echo "Usage: $0 [ -n ITERATION ] [ -t WHICH-TEST ]" 1>&2 
 }
 
 exit_abnormal() {
@@ -9,10 +9,13 @@ exit_abnormal() {
   exit 1
 }
 
-while getopts ":n:" options; do
+while getopts ":n:t:" options; do
     case "${options}" in
     n)
         ITER=${OPTARG}
+        ;;
+    t)
+        TEST=${OPTARG}
         ;;
     :)
         echo "Error: -${OPTARG} requires an argument."
@@ -29,8 +32,15 @@ if [ "$ITER" == "" ]; then
     exit_abnormal
 fi
 
+if [ "$TEST" == "" ]; then
+    echo "Must provide a -t to specify which test to run! Can be 2A, 2B, 2C or 2D\n"
+    exit_abnormal
+fi
+
+OUTFILE="testout_${TEST}.txt"
+
 echo "Job started..."
-echo "Start running raft tests ${ITER} times..." > testout.txt
+echo "Start running raft tests ${ITER} times..." > ${OUTFILE}
 
 MAX=$(($ITER))
 ratio=0
@@ -62,9 +72,9 @@ do
         ratio=$(echo "scale=3; ${ratio}+$scale"|bc)
     fi
 
-    echo "starting iteration ${i}: " >> testout.txt
-    go test -run 2C -race >> testout.txt
-    echo "" >> testout.txt
+    echo "starting iteration ${i}: " >> ${OUTFILE}
+    go test -run ${TEST} -race >> ${OUTFILE}
+    echo "" >> ${OUTFILE}
 
 done
 printf "Test Progress: [%-20s]%.1f%%\n" "####################" "100"
@@ -72,8 +82,8 @@ printf "Test Progress: [%-20s]%.1f%%\n" "####################" "100"
 end=`date +%s.%N`
 runtime=$( echo "$end - $start" | bc -l )
 
-pass_num=$(cat testout.txt | grep ok | wc -l | xargs)
-echo "Running the test a total of ${ITER} times, with ${pass_num} times passed. \nTotal time spent: ${runtime} seconds." >> testout.txt
+pass_num=$(cat ${OUTFILE} | grep ok | wc -l | xargs)
+echo "Running the test a total of ${ITER} times, with ${pass_num} times passed. \nTotal time spent: ${runtime} seconds." >> ${OUTFILE}
 
 echo "Job done!"
 echo "Running the test a total of ${ITER} times, with ${pass_num} times passed. \nTotal time spent: ${runtime} seconds."

@@ -1,0 +1,23 @@
+Start running raft tests 2 times...
+starting iteration 1: 
+Test (2A): initial election ...
+  ... Passed --   3.1  3   60   17136    0
+Test (2A): election after network failure ...
+  ... Passed --   4.6  3  134   27980    0
+Test (2A): multiple elections ...
+  ... Passed --   5.4  7  612  122726    0
+PASS
+ok  	6.824/raft	13.548s
+
+starting iteration 2: 
+Test (2A): initial election ...
+  ... Passed --   3.0  3   58   16556    0
+Test (2A): election after network failure ...
+  ... Passed --   4.5  3  132   27422    0
+Test (2A): multiple elections ...
+  ... Passed --   5.5  7  588  119446    0
+PASS
+ok  	6.824/raft	13.347s
+
+Running the test a total of 2 times, with 2 times passed. 
+Total time spent: 28.9 seconds.
