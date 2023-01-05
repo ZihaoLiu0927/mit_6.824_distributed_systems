@@ -18,8 +18,8 @@ This repo records my implementation for all lab assignments of the public course
   - [x] Lab 2D: Raft snapshotting/log compaction
     - Implemented snapshot mechanisms to avoid machine running out of memory and storage, including snapshot function called by server and an install snapshot RPC function used by leader to handle follower lagging too behind.
   
-- [ ] Lab 3: Fault-tolerant Key/Value Service
-  - [ ] Lab 3A: Key/value Service Without Log Compaction
+- [x] Lab 3: Fault-tolerant Key/Value Service
+  - [x] Lab 3A: Key/value Service Without Log Compaction
   - [ ] Lab 3B: Key/value Service With Log Compaction
 
 ## Environment
@@ -27,9 +27,9 @@ This repo records my implementation for all lab assignments of the public course
 - Go 1.19.3
 
 ## How to Run Test
-To eliminate any non-deterministic factors that possibly result in unstable test results by chance or any corner cases happenning extremely infrequently, I created a shell script that could run the tests n times and summarize the frequency of test passing; where n can be manually passed in e.g. -n 100.
+To eliminate any non-deterministic factors that possibly result in unstable test results by chance or any corner cases happenning extremely infrequently, I created a shell script that could run the tests n times and summarize the frequency of test passing; where n can be manually passed in e.g. -n 100, and t can be passed to assign specific test e.g. -n 2D (run test 2D 100 times).
 
 ```shell
 cd mit_6.824_distributed_system
-sh src/raft/runRaftTest.sh -n 100
+sh src/raft/runRaftTest.sh -n 100 -t 2D
 ```
