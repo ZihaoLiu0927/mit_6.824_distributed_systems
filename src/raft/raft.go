@@ -48,6 +48,7 @@ type ApplyMsg struct {
 	CommandValid bool
 	Command      interface{}
 	CommandIndex int
+	CommandTerm  int
 
 	// For 2D:
 	SnapshotValid bool
@@ -145,6 +146,9 @@ type Raft struct {
 	status        Status
 	applyCh       chan ApplyMsg
 	LastSnapshot  []byte
+	heartbeatTK   *time.Ticker
+	triggerHB     chan bool
+	//snapshotting  bool
 }
 
 // Helper functions
@@ -200,12 +204,14 @@ func (rf *Raft) stepforward() int {
 
 // Access the latest log index. The persist func does not claim a lock itself.
 func (rf *Raft) rawToLocalIndex(rawIndex int) int {
-	return rawIndex - (rf.pstate.LastIncludedIndex + 1)
+	offset := rf.pstate.LastIncludedIndex + 1
+	return rawIndex - offset
 }
 
-// Access the latest log index. The persist func does not claim a lock itself.
+// Convert local index on this machine to raw index. The func does not claim a lock itself.
 func (rf *Raft) localToRawIndex(localIndex int) int {
-	return localIndex + (rf.pstate.LastIncludedIndex + 1)
+	offset := rf.pstate.LastIncludedIndex + 1
+	return localIndex + offset
 }
 
 // The persist func does not claim a lock itself.
@@ -232,10 +238,11 @@ func (rf *Raft) updateSnapshotInfo(index int, term int, data []byte) {
 // return currentTerm and whether this server
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
-	// Your code here (2A).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	return rf.pstate.CurrentTerm, rf.status == Leader
+	currTerm := rf.pstate.CurrentTerm
+	isLeader := rf.status == Leader
+	return currTerm, isLeader
 }
 
 // save Raft's persistent state to stable storage,
@@ -310,8 +317,8 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	}
 
 	// install snapshot rejected because the incoming snapshot has been installed already
-	realIdx := rf.rawToLocalIndex(args.LastIncludedIndex)
-	if realIdx < 0 {
+	localIdx := rf.rawToLocalIndex(args.LastIncludedIndex)
+	if localIdx < 0 {
 		return
 	}
 
@@ -435,10 +442,10 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	}
 
 	rf.vstate.leaderId = args.LeaderId
+	rf.resetTimer()
 
 	// Access the last log in this machine
 	lastLog, _ := rf.getLastLogEntry()
-	rf.resetTimer()
 
 	// step 2: Reply FALSE if log doesn’t contain an entry at prevLogIndex
 	if args.PrevLogIndex > 0 && args.PrevLogIndex > rf.pstate.LatestIndex {
@@ -450,6 +457,11 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	// Get the prevLogIndex matched entry in this machine
 	prevLog, prevLogLocalIndex := rf.getLogEntry(args.PrevLogIndex)
+
+	// Ignore any outdated AppendEntries RPC
+	if prevLogLocalIndex < -1 {
+		return
+	}
 
 	//step 3: Reply FALSE if log does contain an entry at prevLogIndex but term does not matche prevLogTerm
 	if args.PrevLogIndex >= 0 && prevLog.TermReceive != args.PrevLogTerm {
@@ -463,6 +475,9 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			rf.me, rf.pstate.CurrentTerm, args.LeaderId, args.Term, args.PrevLogIndex, reply.BackupIndex)
 		return
 	}
+
+	DPrintf("Heartbeat for %v[%v], from leader %v[%v], follower's previous logs is: [pos: %v, term: %v], prevLogIndex: [local %v, raw %v]",
+		rf.me, rf.pstate.CurrentTerm, args.LeaderId, args.Term, lastLog.RawIndex, lastLog.TermReceive, prevLogLocalIndex, args.PrevLogIndex)
 
 	// save the last log info on this machine before updating the log entry array
 	olgLatestIndex := lastLog.RawIndex
@@ -588,6 +603,11 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.vstate.leaderState.nextIndex[rf.me] += 1
 	rf.vstate.leaderState.matchIndex[rf.me] = index
 
+	select {
+	case rf.triggerHB <- true:
+	default:
+	}
+
 	DPrintf("New command come to leader %v[%v], command position: %v", rf.me, rf.pstate.CurrentTerm, index)
 	lastLog, _ := rf.getLastLogEntry()
 
@@ -652,7 +672,7 @@ func (rf *Raft) ticker() {
 // This function does not claim a lock
 func (rf *Raft) commiter() {
 
-	for rf.killed() == false {
+	for !rf.killed() {
 
 		message := make([]ApplyMsg, 0)
 		rf.mu.Lock()
@@ -665,8 +685,7 @@ func (rf *Raft) commiter() {
 			// entry is guaranteed not being snapshoted yet
 			entry, localIdx := rf.getLogEntry(rf.vstate.lastApplied)
 			DPrintf("server %v applied a log to state machine at local index %v, command is %v", rf.me, localIdx, entry.Command)
-			//DPrintf("server: %v, sending entry: [pos: %v, term: %v] to state machine", rf.me, entry.Pos, entry.TermReceive)
-			message = append(message, ApplyMsg{CommandValid: true, Command: entry.Command, CommandIndex: rf.vstate.lastApplied})
+			message = append(message, ApplyMsg{CommandValid: true, Command: entry.Command, CommandIndex: rf.vstate.lastApplied, CommandTerm: entry.TermReceive})
 		}
 		rf.mu.Unlock()
 
@@ -798,6 +817,7 @@ func (rf *Raft) updateCommitIndex() {
 	}
 }
 
+// prepare args for an AppendEntries RPC call
 // This function does not claim lock itself
 func (rf *Raft) prepareAppendArgs(term int, leaderCommit int, nextIndex int, nextRealIndex int) (AppendEntriesArgs, AppendEntriesReply, int) {
 	if nextRealIndex < 0 {
@@ -833,6 +853,8 @@ func (rf *Raft) prepareAppendArgs(term int, leaderCommit int, nextIndex int, nex
 
 }
 
+// process the response of a InstallSnapshot RPC reply
+// This function does not claim lock itself
 func (rf *Raft) processAppendEntries(peerId int, term int, lastCompare int, args AppendEntriesArgs, reply AppendEntriesReply) {
 	if !rf.sendAppendEntries(peerId, &args, &reply) {
 		return
@@ -869,6 +891,9 @@ func (rf *Raft) processAppendEntries(peerId int, term int, lastCompare int, args
 		}
 	}
 }
+
+// prepare args for a InstallSnapshot RPC call
+// This function does not claim lock itself
 func (rf *Raft) prepareSnapshotArgs(term int, leaderCommit int, nextIndex int, nextRealIndex int) (InstallSnapshotArgs, InstallSnapshotReply, int) {
 	args := InstallSnapshotArgs{
 		Term:              term,
@@ -882,6 +907,8 @@ func (rf *Raft) prepareSnapshotArgs(term int, leaderCommit int, nextIndex int, n
 	return args, reply, SnapshotIndex
 }
 
+// process the response of a InstallSnapshot RPC reply
+// This function does not claim lock itself
 func (rf *Raft) processInstallSnapshot(peerId int, term int, SnapshotIndex int, args InstallSnapshotArgs, reply InstallSnapshotReply) {
 	if !rf.sendInstallSnapshot(peerId, &args, &reply) {
 		return
@@ -909,44 +936,53 @@ func (rf *Raft) processInstallSnapshot(peerId int, term int, SnapshotIndex int, 
 	}
 }
 
+// sending heartbeats for all raft peers
+func (rf *Raft) sendHeartBeat() {
+	rf.mu.Lock()
+	if rf.status != Leader {
+		rf.mu.Unlock()
+		return
+	}
+	term := rf.pstate.CurrentTerm
+	me := rf.me
+	leaderCommit := rf.vstate.commitIndex
+	rf.mu.Unlock()
+
+	for i := range rf.peers {
+
+		if i == me {
+			continue
+		}
+		// Send heartbeats to all followers
+		go func(peerId int) {
+
+			rf.mu.Lock()
+			nextIndex := rf.vstate.leaderState.nextIndex[peerId]
+			nextLocalIndex := rf.rawToLocalIndex(nextIndex)
+
+			// if the nextIndex for the follower is being after the snapshot of current leader's logs, send appendEntries RPC.
+			// else if the nextIndex for the follower is lagging before the snapshot point of the current leader's logs, send installSnapshpt RPC instead.
+			if nextLocalIndex >= 0 {
+				args, reply, lastCompare := rf.prepareAppendArgs(term, leaderCommit, nextIndex, nextLocalIndex)
+				rf.mu.Unlock()
+				rf.processAppendEntries(peerId, term, lastCompare, args, reply)
+			} else {
+				args, reply, lastCompare := rf.prepareSnapshotArgs(term, leaderCommit, nextIndex, nextLocalIndex)
+				rf.mu.Unlock()
+				rf.processInstallSnapshot(peerId, term, lastCompare, args, reply)
+			}
+		}(i)
+	}
+}
+
 func (rf *Raft) heartbeat() {
 	for rf.killed() == false {
-		rf.mu.Lock()
-		if rf.status != Leader {
-			rf.mu.Unlock()
-			return
+		select {
+		case <-rf.heartbeatTK.C:
+			rf.sendHeartBeat()
+		case <-rf.triggerHB:
+			rf.sendHeartBeat()
 		}
-		term := rf.pstate.CurrentTerm
-		me := rf.me
-		leaderCommit := rf.vstate.commitIndex
-		rf.mu.Unlock()
-
-		for i := range rf.peers {
-
-			if i == me {
-				continue
-			}
-			// Send heartbeats to all followers
-			go func(peerId int) {
-
-				rf.mu.Lock()
-				nextIndex := rf.vstate.leaderState.nextIndex[peerId]
-				nextRealIndex := rf.rawToLocalIndex(nextIndex)
-
-				// if the nextIndex for the follower is being after the snapshot of current leader's logs, send appendEntries RPC.
-				// else if the nextIndex for the follower is lagging before the snapshot point of the current leader's logs, send installSnapshpt RPC instead.
-				if nextRealIndex >= 0 {
-					args, reply, lastCompare := rf.prepareAppendArgs(term, leaderCommit, nextIndex, nextRealIndex)
-					rf.mu.Unlock()
-					rf.processAppendEntries(peerId, term, lastCompare, args, reply)
-				} else {
-					args, reply, lastCompare := rf.prepareSnapshotArgs(term, leaderCommit, nextIndex, nextRealIndex)
-					rf.mu.Unlock()
-					rf.processInstallSnapshot(peerId, term, lastCompare, args, reply)
-				}
-			}(i)
-		}
-		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -984,6 +1020,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.vstate.leaderState.matchIndex = make([]int, len(peers))
 	rf.applyCh = applyCh
 	rf.status = Follower
+	rf.heartbeatTK = time.NewTicker(100 * time.Millisecond)
+	rf.triggerHB = make(chan bool, 1)
 	rf.resetTimer()
 
 	// initialize from state persisted before a crash

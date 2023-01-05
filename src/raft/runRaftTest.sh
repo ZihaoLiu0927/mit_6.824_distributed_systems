@@ -63,7 +63,7 @@ do
     fi
 
     echo "starting iteration ${i}: " >> testout.txt
-    go test -run 2D -race >> testout.txt
+    go test -run 2C -race >> testout.txt
     echo "" >> testout.txt
 
 done
