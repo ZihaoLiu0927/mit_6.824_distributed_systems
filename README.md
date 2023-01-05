@@ -27,7 +27,7 @@ This repo records my implementation for all lab assignments of the public course
 - Go 1.19.3
 
 ## How to Run Test
-To eliminate any non-deterministic factors that possibly result in unstable test results by chance or any corner cases happenning extremely infrequently, I created a shell script that could run the tests n times and summarize the frequency of test passing; where n can be manually passed in e.g. -n 100.
+To eliminate any non-deterministic factors that possibly result in unstable test results by chance or any corner cases happenning extremely infrequently, I created a shell script that could run the tests n times and summarize the frequency of test passing; where n can be manually passed in e.g. -n 100, and t can be passed to assign specific test e.g. -n 2D (run test 2D 100 times).
 
 ```shell
 cd mit_6.824_distributed_system
