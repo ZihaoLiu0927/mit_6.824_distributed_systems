@@ -31,5 +31,47 @@ To eliminate any non-deterministic factors that possibly result in unstable test
 
 ```shell
 cd mit_6.824_distributed_system
-sh src/raft/runRaftTest.sh -n 100 -t 2D
+sh src/raft/runRaftTest.sh -n 20 -t 2D
+```
+You may see results like the following:
+```markdown
+starting iteration 19: 
+
+...
+
+Test (2D): snapshots basic ...
+  ... Passed --   3.9  3  226   89828  187
+Test (2D): install snapshots (disconnect) ...
+  ... Passed --  46.2  3 1534  678760  345
+Test (2D): install snapshots (disconnect+unreliable) ...
+  ... Passed --  61.3  3 1910  890935  336
+Test (2D): install snapshots (crash) ...
+  ... Passed --  26.7  3  882  482514  337
+Test (2D): install snapshots (unreliable+crash) ...
+  ... Passed --  32.8  3 1010  535288  336
+Test (2D): crash and restart all servers ...
+  ... Passed --   7.7  3  274   81210   58
+PASS
+ok  	6.824/raft	179.346s
+
+starting iteration 20: 
+Test (2D): snapshots basic ...
+  ... Passed --   3.9  3  276  110691  209
+Test (2D): install snapshots (disconnect) ...
+  ... Passed --  45.0  3 1472  691877  298
+Test (2D): install snapshots (disconnect+unreliable) ...
+  ... Passed --  64.1  3 1966  832868  329
+Test (2D): install snapshots (crash) ...
+  ... Passed --  27.5  3  874  413997  294
+Test (2D): install snapshots (unreliable+crash) ...
+  ... Passed --  34.8  3 1068  541261  317
+Test (2D): crash and restart all servers ...
+  ... Passed --   8.6  3  318   94702   70
+PASS
+ok  	6.824/raft	184.579s
+
+Test Progress: [####################]100.0%
+
+Running the test a total of 20 times, with 20 times passed. 
+Total time spent: 3599.9 seconds.
 ```
