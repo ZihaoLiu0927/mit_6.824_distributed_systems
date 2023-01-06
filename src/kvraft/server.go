@@ -61,7 +61,7 @@ type KVServer struct {
 }
 
 func (kv *KVServer) waitApply(idx int, term int, command string, uniID int, key string, waitCh chan AppliedOp) (bool, bool) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	select {
 	case doneOp := <-waitCh:
 		DPrintf("start returned for uniID op %v: [%v, %v, %v]; commiter returned: [%v, %v, %v]", uniID, idx, term, command, doneOp.Index, doneOp.Term, doneOp.Command)
@@ -72,7 +72,6 @@ func (kv *KVServer) waitApply(idx int, term int, command string, uniID int, key 
 		return true, false
 	case <-ticker.C:
 		ticker.Stop()
-		//fmt.Println("timeout happened!")
 		return false, true
 	}
 }
@@ -192,7 +191,7 @@ func (kv *KVServer) applier() {
 	for !kv.killed() {
 		select {
 		case op := <-kv.applyCh:
-			//fmt.Printf("server %v receives a applymsg from ch: %v\n", kv.me, op)
+			DPrintf("server %v receives a applymsg from ch: %v\n", kv.me, op)
 			if op.CommandValid {
 				success := false
 				replyValue := ""

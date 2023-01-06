@@ -944,6 +944,7 @@ func (rf *Raft) sendHeartBeat() {
 	term := rf.pstate.CurrentTerm
 	me := rf.me
 	leaderCommit := rf.vstate.commitIndex
+	nextIndexes := append([]int{}, rf.vstate.leaderState.nextIndex...)
 	rf.mu.Unlock()
 
 	for i := range rf.peers {
@@ -955,7 +956,7 @@ func (rf *Raft) sendHeartBeat() {
 		go func(peerId int) {
 
 			rf.mu.Lock()
-			nextIndex := rf.vstate.leaderState.nextIndex[peerId]
+			nextIndex := nextIndexes[peerId]
 			nextLocalIndex := rf.rawToLocalIndex(nextIndex)
 
 			// if the nextIndex for the follower is being after the snapshot of current leader's logs, send appendEntries RPC.

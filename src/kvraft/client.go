@@ -12,7 +12,7 @@ type Clerk struct {
 	// You will have to modify this struct.
 	nServer      int
 	opid         int
-	lastLeader   int64
+	lastLeader   int
 	clientId     int64
 	lastSeenOpid int
 }
@@ -31,7 +31,7 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck.nServer = len(ck.servers)
 	ck.opid = 0
 	ck.lastSeenOpid = -1
-	ck.lastLeader = nrand() % int64(ck.nServer)
+	ck.lastLeader = int(nrand()) % ck.nServer
 	ck.clientId = nrand()
 	return ck
 }
@@ -62,7 +62,7 @@ func (ck *Clerk) Get(key string) string {
 		ok := ck.servers[i].Call("KVServer.Get", &args, &reply)
 
 		if !ok || reply.Err != "" {
-			i = (i + 1) % int64(ck.nServer)
+			i = (i + 1) % ck.nServer
 			continue
 		}
 
@@ -99,7 +99,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		ok := ck.servers[i].Call("KVServer.PutAppend", &args, &reply)
 
 		if !ok || reply.Err != "" {
-			i = (i + 1) % int64(ck.nServer)
+			i = (i + 1) % ck.nServer
 			continue
 		}
 
