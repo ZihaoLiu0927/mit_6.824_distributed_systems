@@ -35,10 +35,10 @@ sh src/raft/runRaftTest.sh -n 20 -t 2D
 ```
 You may see results like the following:
 ```markdown
-starting iteration 19: 
 
 ...
 
+starting iteration 19: 
 Test (2D): snapshots basic ...
   ... Passed --   3.9  3  226   89828  187
 Test (2D): install snapshots (disconnect) ...
