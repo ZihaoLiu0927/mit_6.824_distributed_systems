@@ -33,7 +33,7 @@ To eliminate any non-deterministic factors that possibly result in unstable test
 cd mit_6.824_distributed_system
 sh src/raft/runRaftTest.sh -n 20 -t 2D
 ```
-You may see results like the following:
+The results would be like:
 ```markdown
 
 ...
