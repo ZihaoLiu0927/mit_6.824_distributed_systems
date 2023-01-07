@@ -817,13 +817,13 @@ func (rf *Raft) updateCommitIndex() {
 
 // prepare args for an AppendEntries RPC call
 // This function does not claim lock itself
-func (rf *Raft) prepareAppendArgs(term int, leaderCommit int, nextIndex int, nextRealIndex int) (AppendEntriesArgs, AppendEntriesReply, int) {
-	if nextRealIndex < 0 {
+func (rf *Raft) prepareAppendArgs(term int, leaderCommit int, nextIndex int, nextLocalIndex int) (AppendEntriesArgs, AppendEntriesReply, int) {
+	if nextLocalIndex < 0 {
 		return AppendEntriesArgs{}, AppendEntriesReply{}, -1
 	}
 
 	entries := make([]Log, 0)
-	for i := nextRealIndex; i < len(rf.pstate.Logs); i++ {
+	for i := nextLocalIndex; i < len(rf.pstate.Logs); i++ {
 		entries = append(entries, rf.pstate.Logs[i])
 	}
 
@@ -937,40 +937,36 @@ func (rf *Raft) processInstallSnapshot(peerId int, term int, SnapshotIndex int, 
 // sending heartbeats for all raft peers
 func (rf *Raft) sendHeartBeat() {
 	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
 	if rf.status != Leader {
-		rf.mu.Unlock()
 		return
 	}
 	term := rf.pstate.CurrentTerm
 	me := rf.me
 	leaderCommit := rf.vstate.commitIndex
-	nextIndexes := append([]int{}, rf.vstate.leaderState.nextIndex...)
-	rf.mu.Unlock()
 
 	for i := range rf.peers {
-
 		if i == me {
 			continue
 		}
-		// Send heartbeats to all followers
-		go func(peerId int) {
+		nextIndex := rf.vstate.leaderState.nextIndex[i]
+		nextLocalIndex := rf.rawToLocalIndex(nextIndex)
+		// if the nextIndex for the follower is being after the snapshot of current leader's logs, send appendEntries RPC.
+		// else if the nextIndex for the follower is lagging before the snapshot point of the current leader's logs, send installSnapshpt RPC instead.
+		if nextLocalIndex >= 0 {
+			argsAppend, replyAppend, lastCompare := rf.prepareAppendArgs(term, leaderCommit, nextIndex, nextLocalIndex)
+			// Send heartbeats to all followers
+			go func(peerId int) {
+				rf.processAppendEntries(peerId, term, lastCompare, argsAppend, replyAppend)
+			}(i)
+		} else {
+			argsSnapshot, replySnapshot, lastCompare := rf.prepareSnapshotArgs(term, leaderCommit, nextIndex, nextLocalIndex)
+			go func(peerId int) {
+				rf.processInstallSnapshot(peerId, term, lastCompare, argsSnapshot, replySnapshot)
+			}(i)
+		}
 
-			rf.mu.Lock()
-			nextIndex := nextIndexes[peerId]
-			nextLocalIndex := rf.rawToLocalIndex(nextIndex)
-
-			// if the nextIndex for the follower is being after the snapshot of current leader's logs, send appendEntries RPC.
-			// else if the nextIndex for the follower is lagging before the snapshot point of the current leader's logs, send installSnapshpt RPC instead.
-			if nextLocalIndex >= 0 {
-				args, reply, lastCompare := rf.prepareAppendArgs(term, leaderCommit, nextIndex, nextLocalIndex)
-				rf.mu.Unlock()
-				rf.processAppendEntries(peerId, term, lastCompare, args, reply)
-			} else {
-				args, reply, lastCompare := rf.prepareSnapshotArgs(term, leaderCommit, nextIndex, nextLocalIndex)
-				rf.mu.Unlock()
-				rf.processInstallSnapshot(peerId, term, lastCompare, args, reply)
-			}
-		}(i)
 	}
 }
 

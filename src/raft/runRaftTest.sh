@@ -82,7 +82,7 @@ printf "Test Progress: [%-20s]%.1f%%\n" "####################" "100"
 end=`date +%s.%N`
 runtime=$( echo "$end - $start" | bc -l )
 
-pass_num=$(cat ${OUTFILE} | grep ok | wc -l | xargs)
+pass_num=$(cat ${OUTFILE} | grep PASS$ | wc -l | xargs)
 echo "Running the test a total of ${ITER} times, with ${pass_num} times passed. \nTotal time spent: ${runtime} seconds." >> ${OUTFILE}
 
 echo "Job done!"
