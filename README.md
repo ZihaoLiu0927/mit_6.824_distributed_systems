@@ -20,7 +20,7 @@ This repo records my implementation for all lab assignments of the public course
   
 - [x] Lab 3: Fault-tolerant Key/Value Service
   - [x] Lab 3A: Key/value Service Without Log Compaction
-    - Built a fault-tolerant key/value storage service using the Raft library in Lab 2. The server is able to handle 3 types of commands from client: "get", "put" and "append", with strong consistency and linearizability from clients' perspective.
+    - Built a fault-tolerant key/value storage service using the Raft library in Lab 2. The server is able to handle 3 types of commands from client: "Get", "Put" and "Append", with strong consistency and linearizability from clients' perspective.
   - [x] Lab 3B: Key/value Service With Log Compaction
     - Enabled snapshot and persistent states as implemented in Raft to provide a long-running server with fault-tolerant to server crashes.
 
