@@ -26,52 +26,50 @@ This repo records my implementation for all lab assignments of the public course
 
 - Go 1.19.3
 
-## How to Run Test
-To eliminate any non-deterministic factors that possibly result in unstable test results by chance or any corner cases happenning extremely infrequently, I created a shell script that could run the tests n times and summarize the frequency of test passing; where parameter n can be manually passed in e.g. -n 100, and parameter t can be passed to assign a specific test e.g. -n 2D (run test 2D 100 times).
+## How to run test and prove the system correctness
+To eliminate any non-deterministic factors that possibly result in unstable test results by chance or any corner cases happenning extremely infrequently, I created a shell script that could run the tests n times and summarize the frequency of test passing; where parameter n can be manually passed in e.g. -n 50, and parameter t can be passed to assign a specific test e.g. -n 50 -t 2D (run test 2D 50 times). All the tests were run at least 50 times to ensure the system correctness.
 
 ```shell
 cd mit_6.824_distributed_system
-sh src/raft/runRaftTest.sh -n 20 -t 2D
+sh src/raft/runRaftTest.sh -n 50 -t 2D
 ```
 The results would be like:
 ```markdown
 
 ...
 
-starting iteration 19: 
+starting iteration 49: 
 Test (2D): snapshots basic ...
-  ... Passed --   3.9  3  226   89828  187
+  ... Passed --   3.8  3  288  111343  224
 Test (2D): install snapshots (disconnect) ...
-  ... Passed --  46.2  3 1534  678760  345
+  ... Passed --  45.2  3 1516  703411  328
 Test (2D): install snapshots (disconnect+unreliable) ...
-  ... Passed --  61.3  3 1910  890935  336
+  ... Passed --  60.8  3 1906  776713  319
 Test (2D): install snapshots (crash) ...
-  ... Passed --  26.7  3  882  482514  337
+  ... Passed --  27.1  3  876  391973  290
 Test (2D): install snapshots (unreliable+crash) ...
-  ... Passed --  32.8  3 1010  535288  336
+  ... Passed --  31.3  3 1024  546287  361
 Test (2D): crash and restart all servers ...
-  ... Passed --   7.7  3  274   81210   58
+  ... Passed --   7.1  3  246   72604   52
 PASS
-ok  	6.824/raft	179.346s
+ok  	6.824/raft	175.682s
 
-starting iteration 20: 
+starting iteration 50: 
 Test (2D): snapshots basic ...
-  ... Passed --   3.9  3  276  110691  209
+  ... Passed --   3.8  3  276  106947  207
 Test (2D): install snapshots (disconnect) ...
-  ... Passed --  45.0  3 1472  691877  298
+  ... Passed --  45.8  3 1494  644012  319
 Test (2D): install snapshots (disconnect+unreliable) ...
-  ... Passed --  64.1  3 1966  832868  329
+  ... Passed --  61.9  3 1918  810739  320
 Test (2D): install snapshots (crash) ...
-  ... Passed --  27.5  3  874  413997  294
+  ... Passed --  26.9  3  906  463390  335
 Test (2D): install snapshots (unreliable+crash) ...
-  ... Passed --  34.8  3 1068  541261  317
+  ... Passed --  36.9  3 1142  561211  325
 Test (2D): crash and restart all servers ...
-  ... Passed --   8.6  3  318   94702   70
+  ... Passed --   8.3  3  302   89852   65
 PASS
-ok  	6.824/raft	184.579s
+ok  	6.824/raft	184.066s
 
-Test Progress: [####################]100.0%
-
-Running the test a total of 20 times, with 20 times passed. 
-Total time spent: 3599.9 seconds.
+Running the test a total of 50 times, with 50 times passed. 
+Total time spent: 11045.9 seconds.
 ```
