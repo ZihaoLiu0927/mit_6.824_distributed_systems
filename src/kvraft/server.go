@@ -1,6 +1,7 @@
 package kvraft
 
 import (
+	"bytes"
 	"log"
 	"strings"
 	"sync"
@@ -41,8 +42,8 @@ type AppliedOp struct {
 }
 
 type recordRes struct {
-	err   Err
-	value string
+	Err   Err
+	Value string
 }
 
 type KVServer struct {
@@ -52,11 +53,16 @@ type KVServer struct {
 	applyCh chan raft.ApplyMsg
 	dead    int32 // set by Kill()
 
-	maxraftstate int // snapshot if log grows this big
+	maxraftstate        int // snapshot if log grows this big
+	lastExecutedRaftLog int
 
-	// Your definitions here.
-	data    map[string]string
-	record  map[int64]map[int]recordRes
+	data   map[string]string
+	record map[int64]map[int]recordRes
+
+	raftPersister *raft.Persister
+
+	monitorTK *time.Ticker
+
 	timeout time.Duration
 }
 
@@ -98,8 +104,8 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	clientMap := kv.record[args.Client]
 	// check if the command is a duplicated command that has already been applied
 	if val, ok := clientMap[args.Opid]; ok {
-		reply.Err = val.err
-		reply.Value = val.value
+		reply.Err = val.Err
+		reply.Value = val.Value
 		kv.mu.Unlock()
 		return
 	}
@@ -145,7 +151,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	clientMap := kv.record[args.Client]
 	//check if the command is a duplicated command that has already been applied
 	if val, ok := clientMap[args.Opid]; ok {
-		reply.Err = val.err
+		reply.Err = val.Err
 		kv.mu.Unlock()
 		return
 	}
@@ -182,8 +188,8 @@ func (kv *KVServer) updateHistoryMap(client int64, opid, lastSeen int, val strin
 	delete(clientMap, lastSeen)
 	// Record the execute results into the client map
 	clientMap[opid] = recordRes{
-		err:   EmptyValue,
-		value: val,
+		Err:   EmptyValue,
+		Value: val,
 	}
 }
 
@@ -217,6 +223,7 @@ func (kv *KVServer) applier() {
 		select {
 		case op := <-kv.applyCh:
 			DPrintf("server %v receives a applymsg from ch: %v\n", kv.me, op)
+
 			if op.CommandValid {
 				applyOp := op.Command.(Op)
 
@@ -234,9 +241,14 @@ func (kv *KVServer) applier() {
 					continue
 				}
 
+				// apply the command to state machine
 				replyValue := kv.applyToState(applyOp)
 
+				// update the client history map for this command
 				kv.updateHistoryMap(applyOp.Client, applyOp.Opid, applyOp.LastSeen, replyValue)
+
+				// update the latest raft log index that has been executed so far
+				kv.lastExecutedRaftLog = op.CommandIndex
 
 				kv.mu.Unlock()
 
@@ -251,10 +263,66 @@ func (kv *KVServer) applier() {
 					Command: applyOp.Command,
 				}
 				applyOp.WaitCh <- replyMsg
+
+			} else if op.SnapshotValid {
+				kv.mu.Lock()
+				if op.SnapshotIndex < kv.lastExecutedRaftLog {
+					kv.mu.Unlock()
+					continue
+				}
+				kv.readPersist(op.Snapshot)
+				kv.mu.Unlock()
+
+			} else {
+				DPrintf("Invalid command is applied to state machine. This should not happen as long as the raft is working!\n")
 			}
 		}
 
 	}
+}
+
+func (kv *KVServer) EncodeState() []byte {
+	content := ServerState{
+		Data:   kv.data,
+		Record: kv.record,
+	}
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e.Encode(content)
+	return w.Bytes()
+}
+
+func (kv *KVServer) monitorRaftStateSize() {
+
+	for !kv.killed() {
+		select {
+		case <-kv.monitorTK.C:
+			rfSize := kv.raftPersister.RaftStateSize()
+			if kv.maxraftstate != -1 && rfSize-20 > kv.maxraftstate {
+				kv.mu.Lock()
+				latestExecutedIdx := kv.lastExecutedRaftLog
+				encodedState := kv.EncodeState()
+				kv.rf.Snapshot(latestExecutedIdx, encodedState)
+				kv.mu.Unlock()
+			}
+		}
+	}
+}
+
+func (kv *KVServer) readPersist(data []byte) {
+	if data == nil || len(data) < 1 {
+		return
+	}
+	buf := bytes.NewBuffer(data)
+	dec := labgob.NewDecoder(buf)
+	serverState := ServerState{}
+
+	if dec.Decode(&serverState) != nil {
+		log.Fatal("Error in decoding the persistent states!\n")
+		return
+	}
+	kv.data = serverState.Data
+	kv.record = serverState.Record
 }
 
 // the tester calls Kill() when a KVServer instance won't
@@ -296,6 +364,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv := new(KVServer)
 	kv.me = me
 	kv.maxraftstate = maxraftstate
+	kv.raftPersister = persister
 
 	// You may need initialization code here.
 
@@ -306,9 +375,14 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.data = make(map[string]string)
 	kv.record = make(map[int64]map[int]recordRes)
 
+	kv.monitorTK = time.NewTicker(100 * time.Millisecond)
 	kv.timeout = 500 * time.Millisecond
 
+	kv.readPersist(persister.ReadSnapshot())
+
 	go kv.applier()
+
+	go kv.monitorRaftStateSize()
 
 	return kv
 }

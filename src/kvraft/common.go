@@ -14,13 +14,12 @@ const (
 type Err string
 
 // Put or Append
+// Field names must start with capital letters,
+// otherwise RPC will break.
 type PutAppendArgs struct {
-	Key   string
-	Value string
-	Op    string // "Put" or "Append"
-	// You'll have to add definitions here.
-	// Field names must start with capital letters,
-	// otherwise RPC will break.
+	Key          string
+	Value        string
+	Op           string
 	Opid         int
 	Client       int64
 	LastSeenOpid int
@@ -31,8 +30,7 @@ type PutAppendReply struct {
 }
 
 type GetArgs struct {
-	Key string
-	// You'll have to add definitions here.
+	Key          string
 	Opid         int
 	Client       int64
 	LastSeenOpid int
@@ -41,4 +39,9 @@ type GetArgs struct {
 type GetReply struct {
 	Err   Err
 	Value string
+}
+
+type ServerState struct {
+	Data   map[string]string
+	Record map[int64]map[int]recordRes
 }
