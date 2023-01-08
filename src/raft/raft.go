@@ -226,6 +226,9 @@ func (rf *Raft) getLogEntry(rawIndex int) (Log, int) {
 	if idx < 0 {
 		return Log{"Snapshot", rf.pstate.LastIncludedTerm, rf.pstate.LastIncludedIndex}, idx
 	}
+	if idx >= len(rf.pstate.Logs) {
+		log.Fatal("Trying to access log at index that has not yet been appended. Possibly caused by a flaky network.")
+	}
 	return rf.pstate.Logs[idx], idx
 }
 
