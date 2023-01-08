@@ -13,7 +13,7 @@ type Clerk struct {
 	nServer      int
 	opid         int
 	lastLeader   int
-	clientId     int64
+	clientId     int64 // Client Id is a 64 bit integer randomly generated
 	lastSeenOpid int
 }
 
@@ -61,7 +61,7 @@ func (ck *Clerk) Get(key string) string {
 		reply := GetReply{}
 		ok := ck.servers[i].Call("KVServer.Get", &args, &reply)
 
-		if !ok || reply.Err != "" {
+		if !ok || reply.Err != EmptyValue {
 			i = (i + 1) % ck.nServer
 			continue
 		}
@@ -94,11 +94,11 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 
 	i := ck.lastLeader
 	for {
-		DPrintf("Client %v tries to connect server %v out of %v server \n", ck.clientId, i, ck.nServer)
+		DPrintf("Client %v tries to connect server %v out of %v server for op %v\n", ck.clientId, i, ck.nServer, args.Opid)
 		reply := PutAppendReply{}
 		ok := ck.servers[i].Call("KVServer.PutAppend", &args, &reply)
 
-		if !ok || reply.Err != "" {
+		if !ok || reply.Err != EmptyValue {
 			i = (i + 1) % ck.nServer
 			continue
 		}
@@ -111,8 +111,8 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 }
 
 func (ck *Clerk) Put(key string, value string) {
-	ck.PutAppend(key, value, "Put")
+	ck.PutAppend(key, value, PUT)
 }
 func (ck *Clerk) Append(key string, value string) {
-	ck.PutAppend(key, value, "Append")
+	ck.PutAppend(key, value, APPEND)
 }

@@ -22,7 +22,6 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 }
 
 type Op struct {
-	// Your definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
 	Opid     int
@@ -56,12 +55,13 @@ type KVServer struct {
 	maxraftstate int // snapshot if log grows this big
 
 	// Your definitions here.
-	data   map[string]string
-	record map[int64]map[int]recordRes
+	data    map[string]string
+	record  map[int64]map[int]recordRes
+	timeout time.Duration
 }
 
 func (kv *KVServer) waitApply(idx int, term int, command string, uniID int, key string, waitCh chan AppliedOp) (bool, bool) {
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(kv.timeout)
 	select {
 	case doneOp := <-waitCh:
 		DPrintf("start returned for uniID op %v: [%v, %v, %v]; commiter returned: [%v, %v, %v]", uniID, idx, term, command, doneOp.Index, doneOp.Term, doneOp.Command)
@@ -107,18 +107,18 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 
 	// it is a new command so put it into raft log
 	waitRaftCh := make(chan AppliedOp)
-	op := prepareOp(args.Opid, args.Client, args.Key, "", "Get", waitRaftCh, args.LastSeenOpid)
+	op := prepareOp(args.Opid, args.Client, args.Key, EmptyValue, GET, waitRaftCh, args.LastSeenOpid)
 
 	idx, term, isLeader := kv.rf.Start(op)
 
 	if !isLeader {
 		reply.Err = ErrWrongLeader
-		reply.Value = ""
+		reply.Value = EmptyValue
 		return
 	}
 
-	if success, timeout := kv.waitApply(idx, term, "Get", args.Opid, args.Key, waitRaftCh); success {
-		reply.Err = ""
+	if success, timeout := kv.waitApply(idx, term, GET, args.Opid, args.Key, waitRaftCh); success {
+		reply.Err = EmptyValue
 		kv.mu.Lock()
 		reply.Value = kv.data[args.Key]
 		kv.mu.Unlock()
@@ -128,7 +128,7 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 		} else {
 			reply.Err = ErrWrongLeader
 		}
-		reply.Value = ""
+		reply.Value = EmptyValue
 	}
 
 	kv.mu.Lock()
@@ -163,7 +163,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	}
 
 	if success, timeout := kv.waitApply(idx, term, args.Op, args.Opid, args.Key, waitRaftCh); success {
-		reply.Err = ""
+		reply.Err = EmptyValue
 	} else {
 		if timeout {
 			reply.Err = ErrRaftNoRes
@@ -182,9 +182,34 @@ func (kv *KVServer) updateHistoryMap(client int64, opid, lastSeen int, val strin
 	delete(clientMap, lastSeen)
 	// Record the execute results into the client map
 	clientMap[opid] = recordRes{
-		err:   "",
+		err:   EmptyValue,
 		value: val,
 	}
+}
+
+func (kv *KVServer) applyToState(applyOp Op) string {
+	replyValue := EmptyValue
+
+	if applyOp.Command == PUT {
+		kv.data[applyOp.Key] = applyOp.Value
+
+	} else if applyOp.Command == APPEND {
+		if _, ok := kv.data[applyOp.Key]; !ok {
+			kv.data[applyOp.Key] = applyOp.Value
+		} else {
+			ss := []string{kv.data[applyOp.Key], applyOp.Value}
+			kv.data[applyOp.Key] = strings.Join(ss, "")
+		}
+
+	} else if applyOp.Command == GET {
+		if _, ok := kv.data[applyOp.Key]; !ok {
+			replyValue = EmptyValue
+		} else {
+			replyValue = kv.data[applyOp.Key]
+		}
+	}
+
+	return replyValue
 }
 
 func (kv *KVServer) applier() {
@@ -193,8 +218,6 @@ func (kv *KVServer) applier() {
 		case op := <-kv.applyCh:
 			DPrintf("server %v receives a applymsg from ch: %v\n", kv.me, op)
 			if op.CommandValid {
-				success := false
-				replyValue := ""
 				applyOp := op.Command.(Op)
 
 				// it is possible that the client history map has not been initialized yet here if it is on follower
@@ -211,26 +234,10 @@ func (kv *KVServer) applier() {
 					continue
 				}
 
-				if applyOp.Command == "Put" {
-					kv.data[applyOp.Key] = applyOp.Value
+				replyValue := kv.applyToState(applyOp)
 
-				} else if applyOp.Command == "Append" {
-					if _, ok := kv.data[applyOp.Key]; !ok {
-						kv.data[applyOp.Key] = applyOp.Value
-					} else {
-						ss := []string{kv.data[applyOp.Key], applyOp.Value}
-						kv.data[applyOp.Key] = strings.Join(ss, "")
-					}
-
-				} else if applyOp.Command == "Get" {
-					if _, ok := kv.data[applyOp.Key]; !ok {
-						replyValue = ""
-					} else {
-						replyValue = kv.data[applyOp.Key]
-					}
-				}
 				kv.updateHistoryMap(applyOp.Client, applyOp.Opid, applyOp.LastSeen, replyValue)
-				success = true
+
 				kv.mu.Unlock()
 
 				if applyOp.WaitCh == nil {
@@ -238,7 +245,7 @@ func (kv *KVServer) applier() {
 				}
 
 				replyMsg := AppliedOp{
-					Success: success,
+					Success: true,
 					Index:   op.CommandIndex,
 					Term:    op.CommandTerm,
 					Command: applyOp.Command,
@@ -298,6 +305,8 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	// You may need initialization code here.
 	kv.data = make(map[string]string)
 	kv.record = make(map[int64]map[int]recordRes)
+
+	kv.timeout = 500 * time.Millisecond
 
 	go kv.applier()
 
