@@ -20,7 +20,7 @@ This repo records my implementation for all lab assignments of the public course
   
 - [x] Lab 3: Fault-tolerant Key/Value Service
   - [x] Lab 3A: Key/value Service Without Log Compaction
-  - [ ] Lab 3B: Key/value Service With Log Compaction
+  - [x] Lab 3B: Key/value Service With Log Compaction
 
 ## Environment
 

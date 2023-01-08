@@ -143,6 +143,7 @@ type Raft struct {
 	vstate        Vstate
 	lastHeartbeat time.Time
 	timeout       int
+	rpcTimeout    time.Duration
 	status        Status
 	applyCh       chan ApplyMsg
 	LastSnapshot  []byte
@@ -272,7 +273,7 @@ func (rf *Raft) readPersist(data []byte) {
 		return
 	}
 	rf.pstate = pstate
-	//rf.LastSnapshot = rf.persister.ReadSnapshot()
+	rf.LastSnapshot = rf.persister.ReadSnapshot()
 	rf.vstate.lastApplied = rf.pstate.LastIncludedIndex
 }
 
@@ -281,12 +282,7 @@ func (rf *Raft) persistStateAndSnapshot() {
 	e := labgob.NewEncoder(w)
 	e.Encode(rf.pstate)
 	stateData := w.Bytes()
-
-	if rf.LastSnapshot != nil {
-		rf.persister.SaveStateAndSnapshot(stateData, rf.LastSnapshot)
-	} else {
-		rf.persister.SaveStateAndSnapshot(stateData, nil)
-	}
+	rf.persister.SaveStateAndSnapshot(stateData, rf.LastSnapshot)
 }
 
 // Discard the logs that have been snapshoted in log array
@@ -312,9 +308,16 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	reply.Success = false
 
 	// install snapshot rejected because the leader is outdated
-	if rf.pstate.CurrentTerm > args.Term {
+	if args.Term < rf.pstate.CurrentTerm || rf.killed() {
 		return
 	}
+
+	if args.Term > rf.pstate.CurrentTerm {
+		rf.stepback(args.Term)
+	}
+
+	rf.vstate.leaderId = args.LeaderId
+	rf.resetTimer()
 
 	// install snapshot rejected because the incoming snapshot has been installed already
 	localIdx := rf.rawToLocalIndex(args.LastIncludedIndex)
@@ -322,8 +325,17 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 		return
 	}
 
-	rf.applyCh <- ApplyMsg{SnapshotValid: true, Snapshot: args.Data,
-		SnapshotTerm: args.LastIncludedTerm, SnapshotIndex: args.LastIncludedIndex}
+	// prevent RPC blocked forever
+	ticker := time.NewTicker(rf.rpcTimeout)
+	select {
+	case rf.applyCh <- ApplyMsg{
+		SnapshotValid: true, Snapshot: args.Data,
+		SnapshotTerm: args.LastIncludedTerm, SnapshotIndex: args.LastIncludedIndex}:
+		ticker.Stop()
+	case <-ticker.C:
+		ticker.Stop()
+		return
+	}
 
 	reply.Success = true
 	rf.vstate.lastApplied = max(rf.vstate.lastApplied, args.LastIncludedIndex)
@@ -364,6 +376,9 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 
 	// discard logs before and at index
 	log, localIdx := rf.getLogEntry(index)
+	if localIdx < 0 {
+		return
+	}
 	rf.trimLogAndUpdateSnapInfo(localIdx, log.RawIndex, log.TermReceive, snapshot)
 	rf.vstate.lastApplied = max(rf.vstate.lastApplied, log.RawIndex)
 
@@ -607,6 +622,9 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	}
 
 	DPrintf("New command come to leader %v[%v], command position: %v", rf.me, rf.pstate.CurrentTerm, index)
+
+	DPrintf("Leader %v[%v] most recent index at: %v, LatestIndex: %v, LastIncludedIndex: %v", rf.me, rf.pstate.CurrentTerm, index, rf.pstate.LatestIndex, rf.pstate.LastIncludedIndex)
+
 	lastLog, _ := rf.getLastLogEntry()
 
 	DPrintf("Leader %v[%v] current logs is: [pos: %v, term: %v]; current commitIndex is: %v\n", rf.me,
@@ -1006,6 +1024,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.pstate.LastIncludedIndex = -1
 	rf.pstate.LatestIndex = 0
 
+	rf.rpcTimeout = 100 * time.Millisecond
 	rf.vstate = Vstate{}
 	rf.vstate.leaderId = -1
 	rf.vstate.lastApplied = 0
