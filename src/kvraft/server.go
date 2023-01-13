@@ -95,8 +95,7 @@ func prepareOp(opid int, client int64, key, value, optype string, waitRaftCh cha
 	return op
 }
 
-// Get RPC handler
-func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
+func (kv *KVServer) isOldRequestGet(args *GetArgs, reply *GetReply) bool {
 	kv.mu.Lock()
 	if _, ok := kv.record[args.Client]; !ok {
 		kv.record[args.Client] = make(map[int]recordRes)
@@ -107,9 +106,33 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 		reply.Err = val.Err
 		reply.Value = val.Value
 		kv.mu.Unlock()
-		return
+		return true
 	}
 	kv.mu.Unlock()
+	return false
+}
+
+func (kv *KVServer) isOldRequestPutAppend(args *PutAppendArgs, reply *PutAppendReply) bool {
+	kv.mu.Lock()
+	if _, ok := kv.record[args.Client]; !ok {
+		kv.record[args.Client] = make(map[int]recordRes)
+	}
+	clientMap := kv.record[args.Client]
+	// check if the command is a duplicated command that has already been applied
+	if val, ok := clientMap[args.Opid]; ok {
+		reply.Err = val.Err
+		kv.mu.Unlock()
+		return true
+	}
+	kv.mu.Unlock()
+	return false
+}
+
+// Get RPC handler
+func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
+	if oldReq := kv.isOldRequestGet(args, reply); oldReq {
+		return
+	}
 
 	// it is a new command so put it into raft log
 	waitRaftCh := make(chan AppliedOp)
@@ -144,18 +167,9 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 
 // PutAppend RPC handler
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
-	kv.mu.Lock()
-	if _, ok := kv.record[args.Client]; !ok {
-		kv.record[args.Client] = make(map[int]recordRes)
-	}
-	clientMap := kv.record[args.Client]
-	//check if the command is a duplicated command that has already been applied
-	if val, ok := clientMap[args.Opid]; ok {
-		reply.Err = val.Err
-		kv.mu.Unlock()
+	if oldReq := kv.isOldRequestPutAppend(args, reply); oldReq {
 		return
 	}
-	kv.mu.Unlock()
 
 	// it is a new command so put it into raft log
 	waitRaftCh := make(chan AppliedOp, 1)
