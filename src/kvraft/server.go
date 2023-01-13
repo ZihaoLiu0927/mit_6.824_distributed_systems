@@ -95,42 +95,26 @@ func prepareOp(opid int, client int64, key, value, optype string, waitRaftCh cha
 	return op
 }
 
-func (kv *KVServer) isOldRequestGet(args *GetArgs, reply *GetReply) bool {
+func (kv *KVServer) isOldRequest(client int64, opid int) (bool, recordRes) {
 	kv.mu.Lock()
-	if _, ok := kv.record[args.Client]; !ok {
-		kv.record[args.Client] = make(map[int]recordRes)
+	if _, ok := kv.record[client]; !ok {
+		kv.record[client] = make(map[int]recordRes)
 	}
-	clientMap := kv.record[args.Client]
+	clientMap := kv.record[client]
 	// check if the command is a duplicated command that has already been applied
-	if val, ok := clientMap[args.Opid]; ok {
-		reply.Err = val.Err
-		reply.Value = val.Value
+	if val, ok := clientMap[opid]; ok {
 		kv.mu.Unlock()
-		return true
+		return true, val
 	}
 	kv.mu.Unlock()
-	return false
-}
-
-func (kv *KVServer) isOldRequestPutAppend(args *PutAppendArgs, reply *PutAppendReply) bool {
-	kv.mu.Lock()
-	if _, ok := kv.record[args.Client]; !ok {
-		kv.record[args.Client] = make(map[int]recordRes)
-	}
-	clientMap := kv.record[args.Client]
-	// check if the command is a duplicated command that has already been applied
-	if val, ok := clientMap[args.Opid]; ok {
-		reply.Err = val.Err
-		kv.mu.Unlock()
-		return true
-	}
-	kv.mu.Unlock()
-	return false
+	return false, recordRes{}
 }
 
 // Get RPC handler
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
-	if oldReq := kv.isOldRequestGet(args, reply); oldReq {
+	if oldReq, val := kv.isOldRequest(args.Client, args.Opid); oldReq {
+		reply.Err = val.Err
+		reply.Value = val.Value
 		return
 	}
 
@@ -167,7 +151,8 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 
 // PutAppend RPC handler
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
-	if oldReq := kv.isOldRequestPutAppend(args, reply); oldReq {
+	if oldReq, val := kv.isOldRequest(args.Client, args.Opid); oldReq {
+		reply.Err = val.Err
 		return
 	}
 
