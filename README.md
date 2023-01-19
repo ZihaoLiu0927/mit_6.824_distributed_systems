@@ -24,6 +24,8 @@ This repo records my implementation for all lab assignments of the public course
   - [x] Lab 3B: Key/value Service With Log Compaction
     - Enabled snapshot and persistent states as implemented in Raft to provide a long-running server with fault-tolerant to server crashes.
 
+- [x] Lab 4: Multi raft for Sharded Key/Value Service 
+
 ## Environment
 
 - Go 1.19.3
