@@ -30,7 +30,7 @@ This repo records my implementation for all lab assignments of the public course
 
 - Go 1.19.3
 
-## How to run test and prove the system correctness
+## How to run test for the system correctness
 To eliminate any non-deterministic factors that possibly result in unstable test results by chance or any corner cases happenning extremely infrequently, I created a shell script that could run the tests n times and summarize the frequency of test passing; where parameter n can be manually passed in e.g. -n 50, and parameter t can be passed to assign a specific test e.g. -n 50 -t 2D (run test 2D 50 times). All the tests were run at least 50 times to ensure the system correctness.
 
 ```shell
